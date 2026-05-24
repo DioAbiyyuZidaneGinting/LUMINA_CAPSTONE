@@ -1,2 +1,1 @@
-# Lumina Capstone Production Deployment 
-Trigger build
+# Lumina Capstone
