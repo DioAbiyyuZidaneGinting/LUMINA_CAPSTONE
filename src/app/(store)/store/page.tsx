@@ -90,7 +90,7 @@ function ProductDisplayCard({
   };
 
   return (
-    <div className="group relative">
+    <div className="group relative h-full">
       <div className="bg-white rounded-[32px] border border-zinc-100 overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col h-full">
         {/* Image Container */}
         <div className="relative aspect-[4/5] bg-zinc-50 overflow-hidden">
@@ -404,7 +404,7 @@ function StoreContent() {
     <div className="min-h-screen bg-[#fcfcfc] pb-20">
       {/* Header / Search Summary */}
       <div className="bg-white border-b border-zinc-100 pt-15 pb-12">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-[1350px] mx-auto px-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
               <h1 className="text-5xl font-black text-black tracking-tighter">
@@ -431,7 +431,7 @@ function StoreContent() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-[1350px] mx-auto px-6 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
           {/* Sidebar Filters */}
           <aside className="lg:w-64 flex flex-col gap-8 lg:gap-10 shrink-0 w-full overflow-hidden">
@@ -540,7 +540,7 @@ function StoreContent() {
           </aside>
 
           {/* Main Grid */}
-          <main className="flex-1 space-y-20">
+          <main className="flex-1 min-w-0 space-y-20">
             {/* Sort Bar & Main Products */}
             <div className="space-y-8">
               <div className="flex items-center justify-between bg-white border border-zinc-100 rounded-2xl p-4 shadow-sm">
@@ -569,7 +569,7 @@ function StoreContent() {
               </div>
 
               {isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8 xl:gap-10">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={i}
@@ -578,7 +578,7 @@ function StoreContent() {
                   ))}
                 </div>
               ) : filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8 xl:gap-10">
                   {filteredProducts.map((product) => (
                     <ProductDisplayCard key={product.id} product={product} />
                   ))}
@@ -612,8 +612,11 @@ function StoreContent() {
 
             {/* COLLECTION BANNERS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-10 border-t border-zinc-100">
-              {/* NEW ARRIVALS BANNER */}
-              <div className="relative group overflow-hidden rounded-[40px] h-[400px] bg-zinc-900">
+              {/* NEW ARRIVALS BANNER — full card clickable */}
+              <Link
+                href="/store/new-arrivals"
+                className="relative group overflow-hidden rounded-[40px] h-[400px] bg-zinc-900 block cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+              >
                 <img
                   src="https://i.pinimg.com/736x/8e/6c/a2/8e6ca29c22eafdd62edc8a28730d0733.jpg"
                   className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-1000"
@@ -621,7 +624,7 @@ function StoreContent() {
                 />
                 <div className="absolute inset-0 p-10 flex flex-col justify-end">
                   <div className="space-y-2">
-                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-black px-4 py-1.5  rounded-full uppercase tracking-widest border border-white/20">
+                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-white/20">
                       Summer 2026
                     </span>
                     <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none mt-3">
@@ -632,18 +635,18 @@ function StoreContent() {
                       gaya modern minimalis.
                     </p>
                   </div>
-                  <Link
-                    href="/store/new-arrivals"
-                    className="mt-8 bg-white text-black h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs hover:bg-zinc-100 transition-all shadow-2xl"
-                  >
+                  <div className="mt-8 bg-white text-black h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs group-hover:bg-zinc-100 transition-all shadow-2xl">
                     Show Details{" "}
                     <ChevronDown className="-rotate-90" size={16} />
-                  </Link>
+                  </div>
                 </div>
-              </div>
+              </Link>
 
-              {/* LUXURY BANNER */}
-              <div className="relative group overflow-hidden rounded-[40px] h-[400px] bg-zinc-900">
+              {/* LUXURY BANNER — full card clickable */}
+              <Link
+                href="/store/timeless-luxury"
+                className="relative group overflow-hidden rounded-[40px] h-[400px] bg-zinc-900 block cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+              >
                 <img
                   src="https://i.pinimg.com/736x/97/56/87/97568796c3268b0d0712dcec903bb61e.jpg"
                   className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-1000"
@@ -662,15 +665,12 @@ function StoreContent() {
                       dan gaya untuk gaya hidup jetset.
                     </p>
                   </div>
-                  <Link
-                    href="/store/timeless-luxury"
-                    className="mt-8 bg-gradient-to-r from-amber-600 to-yellow-500 text-white h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs hover:opacity-90 transition-all shadow-2xl shadow-amber-900/20"
-                  >
+                  <div className="mt-8 bg-gradient-to-r from-amber-600 to-yellow-500 text-white h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs group-hover:opacity-90 transition-all shadow-2xl shadow-amber-900/20">
                     Show Details{" "}
                     <ChevronDown className="-rotate-90" size={16} />
-                  </Link>
+                  </div>
                 </div>
-              </div>
+              </Link>
             </div>
           </main>
         </div>

@@ -1621,21 +1621,96 @@ const ManageCategoriesModal = ({ isOpen, onClose, onRefresh }: ManageCategoriesM
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Sub Categories Tab
+  const [activeTab, setActiveTab] = useState<"categories" | "subcategories">("categories");
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [subLoading, setSubLoading] = useState(false);
+  const [subSearch, setSubSearch] = useState("");
+  const [subFilterCat, setSubFilterCat] = useState("all");
+  const [isAddSubOpen, setIsAddSubOpen] = useState(false);
+  const [newSubName, setNewSubName] = useState("");
+  const [newSubParent, setNewSubParent] = useState("");
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubName, setEditSubName] = useState("");
+  const [editSubParent, setEditSubParent] = useState("");
+  const [isSavingSub, setIsSavingSub] = useState(false);
+
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("categories").select("*").order("name");
+      const { data } = await supabase.from("categories").select("*").order("name");
       if (data) setCategories(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+
+  const fetchSubcategories = async () => {
+    setSubLoading(true);
+    try {
+      const { data } = await supabase
+        .from("sub_categories")
+        .select("*, category:categories(id,name)")
+        .order("name");
+      if (data) setSubcategories(data);
+    } catch (e) { console.error(e); } finally { setSubLoading(false); }
+  };
+
+  const handleAddSubcategory = async () => {
+    if (!newSubName.trim()) { toast.error("Nama sub kategori tidak boleh kosong."); return; }
+    if (!newSubParent) { toast.error("Pilih kategori induk terlebih dahulu."); return; }
+    const slug = newSubName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    setIsSavingSub(true);
+    try {
+      const { data: dup } = await supabase.from("sub_categories")
+        .select("id").eq("category_id", newSubParent).ilike("name", newSubName.trim()).maybeSingle();
+      if (dup) { toast.error("Sub kategori ini sudah ada dalam kategori tersebut."); return; }
+      const { error } = await supabase.from("sub_categories")
+        .insert({ category_id: newSubParent, name: newSubName.trim(), slug });
+      if (error) throw error;
+      setNewSubName(""); setNewSubParent(""); setIsAddSubOpen(false);
+      await fetchSubcategories();
+      toast.success("Sub kategori berhasil ditambahkan.");
+    } catch (err: any) { toast.error("Gagal menambah sub kategori: " + err.message);
+    } finally { setIsSavingSub(false); }
+  };
+
+  const handleEditSubcategory = async (sub: any) => {
+    if (!editSubName.trim()) { toast.error("Nama tidak boleh kosong."); return; }
+    if (!editSubParent) { toast.error("Pilih kategori induk."); return; }
+    const slug = editSubName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    setIsSavingSub(true);
+    try {
+      const { data: dup } = await supabase.from("sub_categories")
+        .select("id").eq("category_id", editSubParent).ilike("name", editSubName.trim())
+        .neq("id", sub.id).maybeSingle();
+      if (dup) { toast.error("Sub kategori ini sudah ada dalam kategori tersebut."); return; }
+      const { error } = await supabase.from("sub_categories")
+        .update({ category_id: editSubParent, name: editSubName.trim(), slug }).eq("id", sub.id);
+      if (error) throw error;
+      setEditingSubId(null); setEditSubName(""); setEditSubParent("");
+      await fetchSubcategories();
+      toast.success("Sub kategori diperbarui.");
+    } catch (err: any) { toast.error("Gagal memperbarui: " + err.message);
+    } finally { setIsSavingSub(false); }
+  };
+
+  const handleDeleteSubcategory = async (id: string, name: string) => {
+    const { count: pCount } = await supabase.from("products")
+      .select("id", { count: "exact", head: true }).eq("subcategory_id", id);
+    if (pCount && pCount > 0) {
+      toast.error(`Tidak dapat menghapus "${name}". Ada ${pCount} produk yang terhubung.`);
+      return;
     }
+    if (!confirm(`Hapus sub kategori "${name}"?`)) return;
+    const { error } = await supabase.from("sub_categories").delete().eq("id", id);
+    if (error) { toast.error("Gagal menghapus: " + error.message); return; }
+    await fetchSubcategories();
+    toast.success("Sub kategori dihapus.");
   };
 
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
+      setActiveTab("categories");
     }
   }, [isOpen]);
 
@@ -1871,29 +1946,29 @@ const ManageCategoriesModal = ({ isOpen, onClose, onRefresh }: ManageCategoriesM
 
   const handleDeleteCategory = async (id: string, name: string) => {
     try {
-      const { count, error: countError } = await supabase
-        .from("products")
-        .select("id", { count: "exact", head: true })
-        .eq("category_id", id);
+      // RESTRICT: block delete if subcategories exist
+      const { count: subCount } = await supabase
+        .from("sub_categories").select("id", { count: "exact", head: true }).eq("category_id", id);
+      if (subCount && subCount > 0) {
+        toast.error(`Tidak dapat menghapus "${name}". Hapus ${subCount} sub kategori terkait terlebih dahulu.`);
+        return;
+      }
 
+      const { count, error: countError } = await supabase
+        .from("products").select("id", { count: "exact", head: true }).eq("category_id", id);
       if (countError) throw countError;
 
       const productCount = count || 0;
-      let confirmMsg = `Are you sure you want to delete the category "${name}"?`;
+      let confirmMsg = `Hapus kategori "${name}"?`;
       if (productCount > 0) {
-        confirmMsg = `Kategori ini memiliki ${productCount} produk. Menghapusnya akan memutus relasi produk tersebut. Lanjutkan?`;
+        confirmMsg = `Kategori ini memiliki ${productCount} produk. Menghapusnya akan memutus relasi produk. Lanjutkan?`;
       }
-
       if (!confirm(confirmMsg)) return;
 
-      // Clean up storage files if any
       const { data: cat } = await supabase.from("categories").select("image_url").eq("id", id).single();
       if (cat?.image_url) {
         const parts = cat.image_url.split('/category_images/');
-        if (parts.length > 1) {
-          const filePath = parts[1];
-          await supabase.storage.from("category_images").remove([filePath]);
-        }
+        if (parts.length > 1) await supabase.storage.from("category_images").remove([parts[1]]);
       }
 
       const { error } = await supabase.from("categories").delete().eq("id", id);
@@ -1902,25 +1977,25 @@ const ManageCategoriesModal = ({ isOpen, onClose, onRefresh }: ManageCategoriesM
       await fetchCategories();
       onRefresh();
       toast.success("Category deleted successfully.");
-    } catch (err: any) {
-      toast.error("Failed to delete category: " + err.message);
-    }
+    } catch (err: any) { toast.error("Failed to delete category: " + err.message); }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-slate-800 gap-3 flex-wrap shrink-0">
           <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Manage Categories</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5">
+            <button type="button" onClick={() => setActiveTab("categories")} className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === "categories" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}>Categories</button>
+            <button type="button" onClick={() => { setActiveTab("subcategories"); fetchSubcategories(); }} className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === "subcategories" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}>Sub Categories</button>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-600 transition-colors ml-auto"><X className="w-5 h-5" /></button>
         </div>
 
-        {/* Content */}
+        {activeTab === "categories" ? (
         <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
           {/* Add Category Form */}
           <form onSubmit={handleAddCategory} className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
@@ -2136,6 +2211,114 @@ const ManageCategoriesModal = ({ isOpen, onClose, onRefresh }: ManageCategoriesM
             )}
           </div>
         </div>
+        ) : (
+        /* SUB CATEGORIES TAB */
+        <div className="p-6 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input value={subSearch} onChange={e => setSubSearch(e.target.value)} placeholder="Search sub categories..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs font-bold focus:outline-none dark:text-white" />
+            </div>
+            <select value={subFilterCat} onChange={e => setSubFilterCat(e.target.value)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none dark:text-white shrink-0">
+              <option value="all">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          {/* Add Form */}
+          {isAddSubOpen && (
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">New Sub Category</h4>
+              <div>
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tight block mb-1">Parent Category</label>
+                <select value={newSubParent} onChange={e => setNewSubParent(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none dark:text-white">
+                  <option value="">Select Category</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tight block mb-1">Sub Category Name</label>
+                <input value={newSubName} onChange={e => setNewSubName(e.target.value)} placeholder="e.g. Kemeja" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none dark:text-white" />
+              </div>
+              {newSubName && <p className="text-[9px] text-slate-400">Slug: <span className="font-mono">{newSubName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}</span></p>}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setIsAddSubOpen(false); setNewSubName(""); setNewSubParent(""); }} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[9px] font-bold uppercase tracking-wider">Cancel</button>
+                <button type="button" onClick={handleAddSubcategory} disabled={isSavingSub} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 disabled:opacity-50">
+                  {isSavingSub ? <><span className="w-2.5 h-2.5 border border-white/20 border-t-white rounded-full animate-spin inline-block" /> Saving...</> : "Add Sub Category"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Header row */}
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Sub Categories ({subcategories.filter(s => (subFilterCat === "all" || s.category_id === subFilterCat) && (!subSearch || s.name.toLowerCase().includes(subSearch.toLowerCase()))).length})
+            </h4>
+            {!isAddSubOpen && (
+              <button type="button" onClick={() => { setIsAddSubOpen(true); setEditingSubId(null); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all">
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            )}
+          </div>
+
+          {/* Table */}
+          {subLoading ? (
+            <div className="text-center py-6 text-xs text-slate-400">Loading...</div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+              <table className="w-full min-w-[420px] text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-950">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-slate-400">Name</th>
+                    <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-slate-400">Parent</th>
+                    <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-slate-400 hidden sm:table-cell">Slug</th>
+                    <th className="px-4 py-2.5 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                  {subcategories
+                    .filter(s => (subFilterCat === "all" || s.category_id === subFilterCat) && (!subSearch || s.name.toLowerCase().includes(subSearch.toLowerCase())))
+                    .map(sub => (
+                    <tr key={sub.id} className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      {editingSubId === sub.id ? (
+                        <td colSpan={4} className="px-4 py-3">
+                          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                            <select value={editSubParent} onChange={e => setEditSubParent(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none dark:text-white">
+                              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                            <input value={editSubName} onChange={e => setEditSubName(e.target.value)} className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none dark:text-white" />
+                            <div className="flex gap-1 shrink-0">
+                              <button type="button" onClick={() => { setEditingSubId(null); setEditSubName(""); setEditSubParent(""); }} className="px-2 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg text-[9px] font-bold uppercase text-slate-500">Cancel</button>
+                              <button type="button" onClick={() => handleEditSubcategory(sub)} disabled={isSavingSub} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-[9px] font-bold uppercase disabled:opacity-50">{isSavingSub ? "..." : "Save"}</button>
+                            </div>
+                          </div>
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-2.5 font-bold text-slate-900 dark:text-white">{sub.name}</td>
+                          <td className="px-4 py-2.5 text-slate-500 text-[11px]">{sub.category?.name || "-"}</td>
+                          <td className="px-4 py-2.5 font-mono text-slate-400 text-[10px] hidden sm:table-cell">{sub.slug}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex justify-end gap-1">
+                              <button type="button" onClick={() => { setEditingSubId(sub.id); setEditSubName(sub.name); setEditSubParent(sub.category_id); setIsAddSubOpen(false); }} className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 rounded-xl transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                              <button type="button" onClick={() => handleDeleteSubcategory(sub.id, sub.name)} className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 rounded-xl transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                  {subcategories.filter(s => (subFilterCat === "all" || s.category_id === subFilterCat) && (!subSearch || s.name.toLowerCase().includes(subSearch.toLowerCase()))).length === 0 && (
+                    <tr><td colSpan={4} className="text-center py-8 text-xs text-slate-400">No sub categories found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        )}
       </div>
     </div>
   );
