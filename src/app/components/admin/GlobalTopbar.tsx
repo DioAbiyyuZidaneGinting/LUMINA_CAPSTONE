@@ -126,15 +126,6 @@ export default function GlobalTopbar() {
 
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
 
-        {/* AI Health */}
-        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest md:mr-2 border ${
-          aiHealth === "HEALTHY" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-primary/10 text-primary border-primary/20"
-        }`}>
-          <ShieldCheck className="w-3 h-3" /> AI {aiHealth === "HEALTHY" ? t.aiHealthy : t.aiOptimizing}
-        </div>
-
-        <div className="hidden sm:block w-px h-6 bg-border mx-1"></div>
-
         <div className="flex items-center gap-1">
           {/* Intelligence Alerts Panel */}
           <div className="relative" ref={alertsRef}>

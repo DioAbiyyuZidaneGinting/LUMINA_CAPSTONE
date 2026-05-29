@@ -6,13 +6,11 @@ import {
   Search, 
   Mail, 
   Phone, 
-  MapPin,
   TrendingUp,
   Package,
   Wallet,
   UserPlus,
   Inbox,
-  Calendar,
   ShieldCheck,
   ChevronRight,
   RefreshCw,
@@ -34,48 +32,8 @@ interface Customer {
   phone: string;
   orders: number;
   totalSpent: number;
-  location: string;
-  birthYear: number;
   lastOrderAt: string | null;
   createdAt: string;
-}
-
-function getGeneration(birthYear: number, t: any) {
-  const year = Number(birthYear);
-  if (year >= 1946 && year <= 1964) {
-    return { 
-      label: t.babyBoomer || "Baby Boomer", 
-      color: "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20" 
-    };
-  }
-  if (year >= 1965 && year <= 1976) {
-    return { 
-      label: t.genX || "Gen X", 
-      color: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20" 
-    };
-  }
-  if (year >= 1977 && year <= 1994) {
-    return { 
-      label: t.genY || "Gen Y / Millennial", 
-      color: "bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20" 
-    };
-  }
-  if (year >= 1995 && year <= 2010) {
-    return { 
-      label: t.genZ || "Gen Z", 
-      color: "bg-violet-50 text-violet-600 border-violet-100 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20" 
-    };
-  }
-  if (year >= 2011 && year <= 2025) {
-    return { 
-      label: t.genAlpha || "Gen Alpha", 
-      color: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" 
-    };
-  }
-  return { 
-    label: t.unknown || "Unknown", 
-    color: "bg-slate-50 text-slate-500 border-slate-100 dark:bg-slate-800 dark:text-slate-400" 
-  };
 }
 
 export default function CustomersPage() {
@@ -100,8 +58,6 @@ export default function CustomersPage() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
-  const [newCity, setNewCity] = useState("");
-  const [newBirthYear, setNewBirthYear] = useState("2000");
   const [newClerkId, setNewClerkId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -123,15 +79,13 @@ export default function CustomersPage() {
         phone: c.phone || "",
         orders: Number(c.total_orders || 0),
         totalSpent: Number(c.lifetime_value || 0.00),
-        location: c.city || "Jakarta",
-        birthYear: Number(c.birth_year || 2000),
         lastOrderAt: c.last_order_at,
         createdAt: c.created_at
       }));
 
       setCustomers(mapped);
 
-      // 3. Compute Metrics Summaries
+      // Compute Metrics Summaries
       setTotalCustomersCount(mapped.length);
 
       // New users inside last 30 days
@@ -169,20 +123,17 @@ export default function CustomersPage() {
     return () => window.removeEventListener("refresh-customers", handleRefresh);
   }, [fetchCustomers]);
 
-  // Filter registry items in-memory based on search keywords (Name, email, phone, city, generation)
+  // Filter registry items in-memory based on search keywords (Name, email, phone)
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      const gen = getGeneration(c.birthYear, t).label.toLowerCase();
       const search = searchQuery.toLowerCase();
       return (
         c.name.toLowerCase().includes(search) ||
         c.email.toLowerCase().includes(search) ||
-        c.phone.toLowerCase().includes(search) ||
-        c.location.toLowerCase().includes(search) ||
-        gen.includes(search)
+        c.phone.toLowerCase().includes(search)
       );
     });
-  }, [customers, searchQuery, t]);
+  }, [customers, searchQuery]);
 
   // Export Customer registry entries to local CSV format
   const handleExportRegistry = () => {
@@ -194,16 +145,13 @@ export default function CustomersPage() {
 
       // Compile rows with escaped variables
       const csvContent = [
-        "Nomor Entitas,ID Clerk,Nama Pelanggan,Email,Telepon,Kota,Generasi,Tahun Lahir,Jumlah Pesanan,Lifetime Value (LTV),Tanggal Registrasi",
-        ...filteredCustomers.map((c, i) => [
+        "Nomor Entitas,ID Clerk,Nama Pelanggan,Email,Telepon,Jumlah Pesanan,Lifetime Value (LTV),Tanggal Registrasi",
+        ...filteredCustomers.map((c) => [
           `LUM-${c.id.substring(0, 8).toUpperCase()}`,
           c.clerk_user_id,
           `"${c.name}"`,
           c.email,
           `'${c.phone}`,
-          `"${c.location}"`,
-          `"${getGeneration(c.birthYear, t).label}"`,
-          c.birthYear,
           c.orders,
           c.totalSpent,
           new Date(c.createdAt).toLocaleDateString()
@@ -246,8 +194,8 @@ export default function CustomersPage() {
         name: newName,
         email: newEmail,
         phone: newPhone || null,
-        birth_year: Number(newBirthYear) || 2000,
-        city: newCity || "Jakarta",
+        birth_year: 2000,
+        city: "Jakarta",
       });
 
       if (!response.success) throw new Error(response.error);
@@ -262,8 +210,6 @@ export default function CustomersPage() {
       setNewName("");
       setNewEmail("");
       setNewPhone("");
-      setNewCity("");
-      setNewBirthYear("2000");
       setNewClerkId("");
 
       addNotification({
@@ -331,34 +277,26 @@ export default function CustomersPage() {
             {t.customersSubtitle || "Monitor and manage global customer demographic intelligence."}
           </p>
         </div>
-
-        {/* Global Toolbar */}
-        <button 
-          onClick={fetchCustomers}
-          disabled={refreshing}
-          className="self-start px-5 py-3.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm hover:scale-105 active:scale-95 transition-all duration-300"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
-          {refreshing ? (t.loadingText || "LOADING") : (t.refreshBtn || "PERBARUI")}
-        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Stats Cards - Four rows vertical layout */}
+      <div className="flex flex-col gap-6">
         {stats.map((s, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl hover:shadow-blue-200/20 transition-all duration-500 group">
-            <div className="flex items-center gap-6 mb-6">
-              <div className={`w-14 h-14 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform`}>
+          <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+            <div className="flex items-center gap-6">
+              <div className={`w-14 h-14 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>
                 {s.icon}
               </div>
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{s.value}</p>
+                <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mt-0.5">{s.value}</p>
               </div>
             </div>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed group-hover:text-slate-500 dark:group-hover:text-slate-300 transition-colors">
-              {s.subtitle}
-            </p>
+            <div className="text-left sm:text-right">
+              <p className="text-xs md:text-sm text-slate-400 dark:text-slate-500 font-semibold">
+                {s.subtitle}
+              </p>
+            </div>
           </div>
         ))}
       </div>
@@ -371,7 +309,7 @@ export default function CustomersPage() {
             <Search className="w-5 h-5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="text" 
-              placeholder={t.searchCustomersPlaceholder || "Cari nama, email, kota, atau generasi..."} 
+              placeholder={language === "ID" ? "Cari nama, email, atau telepon..." : "Search name, email, or phone..."} 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl pl-14 pr-6 py-4 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all placeholder:text-slate-400 dark:text-white"
@@ -407,16 +345,13 @@ export default function CustomersPage() {
               <thead>
                 <tr className="bg-slate-50/30 dark:bg-slate-800/30 border-b border-slate-50 dark:border-slate-800">
                   <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.entityName || "Customer Entity"}</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t.generation || "Generation"}</th>
                   <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.contactChannels || "Contact Channels"}</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.region || "Geographic Region"}</th>
                   <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t.ordersCount || "Orders"}</th>
                   <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{t.lifetimeValue || "Lifetime Value"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                 {filteredCustomers.map((c) => {
-                  const gen = getGeneration(c.birthYear, t);
                   return (
                     <tr key={c.id} className="group hover:bg-blue-50/30 dark:hover:bg-blue-500/5 cursor-pointer transition-all duration-300">
                       <td className="px-10 py-8">
@@ -432,11 +367,6 @@ export default function CustomersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-10 py-8 text-center">
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${gen.color}`}>
-                          {gen.label}
-                        </span>
-                      </td>
                       <td className="px-10 py-8">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
@@ -447,11 +377,6 @@ export default function CustomersPage() {
                               <Phone className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {c.phone}
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-10 py-8">
-                        <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
-                          <MapPin className="w-4 h-4 text-rose-500" /> {c.location}
                         </div>
                       </td>
                       <td className="px-10 py-8 text-center">
@@ -573,36 +498,6 @@ export default function CustomersPage() {
                     placeholder="e.g. +62 812-3456-7890"
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all dark:text-white"
-                  />
-                </div>
-
-                {/* City */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {t.cityLabel || "City / Location"}
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Jakarta Selatan"
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all dark:text-white"
-                  />
-                </div>
-
-                {/* Birth Year */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {t.birthYearLabel || "Birth Year (Cohort Classification)"}
-                  </label>
-                  <input 
-                    type="number" 
-                    min="1900"
-                    max={new Date().getFullYear()}
-                    placeholder="e.g. 2000"
-                    value={newBirthYear}
-                    onChange={(e) => setNewBirthYear(e.target.value)}
                     className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all dark:text-white"
                   />
                 </div>

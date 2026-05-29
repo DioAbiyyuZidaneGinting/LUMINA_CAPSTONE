@@ -9,7 +9,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300 admin-scrollbar-hide">
       <AdminSidebar />
       <div className="flex-1 flex flex-col h-screen relative min-w-0">
         <GlobalTopbar />

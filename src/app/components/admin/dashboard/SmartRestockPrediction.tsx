@@ -15,13 +15,8 @@ import {
   BarChart3,
   Brain,
   RefreshCw,
-  Star,
-  Users,
-  Zap,
-  Calendar,
   CheckCircle2,
   Database,
-  Lock,
 } from "lucide-react";
 import { useLanguageStore, translations } from "../../../../store/languageStore";
 import { useSupabaseClient } from "../../../../hooks/useSupabaseClient";
@@ -35,12 +30,39 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
   const t = translations[language];
   const supabase = useSupabaseClient();
 
+  const filterLabels = {
+    ID: {
+      historicalData: "Data Historis",
+      predictionRange: "Rentang Prediksi",
+      daysAgo: (n: number) => `${n} Hari Lalu`,
+      monthsAgo: (n: number) => `${n} Bulan Lalu`,
+      yearAgo: "1 Tahun Lalu",
+      nextDays: (n: number) => `${n} Hari Ke Depan`,
+      nextMonths: (n: number) => `${n} Bulan Ke Depan`,
+    },
+    EN: {
+      historicalData: "Historical Data",
+      predictionRange: "Prediction Range",
+      daysAgo: (n: number) => `${n} Days Ago`,
+      monthsAgo: (n: number) => `${n} Month${n > 1 ? "s" : ""} Ago`,
+      yearAgo: "1 Year Ago",
+      nextDays: (n: number) => `Next ${n} Days`,
+      nextMonths: (n: number) => `Next ${n} Month${n > 1 ? "s" : ""}`,
+    }
+  };
+
+  const currentLabels = filterLabels[language as "ID" | "EN"] || filterLabels.EN;
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendation, setRecommendation] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(94.2);
   const [chartData, setChartData] = useState<any[]>([]);
   const [insufficientData, setInsufficientData] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Filters state
+  const [historyRange, setHistoryRange] = useState(30); // Default to 1 month (30 days)
+  const [predictionRange, setPredictionRange] = useState(7); // Default to next 7 days
 
   const fetchDemandForecast = async () => {
     try {
@@ -70,11 +92,11 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
         return;
       }
 
-      // Group sales count by date for the last 20 days
-      const twentyDaysAgo = new Date();
-      twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+      // Group sales count by date for the last historyRange days
+      const historyDate = new Date();
+      historyDate.setDate(historyDate.getDate() - historyRange);
       
-      const recentItems = itemsList.filter(item => new Date(item.created_at) >= twentyDaysAgo);
+      const recentItems = itemsList.filter(item => new Date(item.created_at) >= historyDate);
       const salesMap: Record<string, number> = {};
       recentItems.forEach(item => {
         const dateStr = new Date(item.created_at).toISOString().split("T")[0];
@@ -82,13 +104,13 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
       });
 
       const totalUnitsSold = recentItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      const avgDailyVelocity = Math.max(1, totalUnitsSold / 20);
+      const avgDailyVelocity = Math.max(1, totalUnitsSold / historyRange);
 
       const data: any[] = [];
       const today = new Date();
 
-      // Back-populate 20 days of actual demand
-      for (let i = 20; i >= 0; i--) {
+      // Back-populate historyRange days of actual demand
+      for (let i = historyRange; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         const dateStr = d.toISOString().split("T")[0];
@@ -104,8 +126,8 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
         });
       }
 
-      // Project next 10 days of forecasted demand
-      for (let i = 1; i <= 10; i++) {
+      // Project next predictionRange days of forecasted demand
+      for (let i = 1; i <= predictionRange; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
         const trendFactor = 1.15;
@@ -130,7 +152,9 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
 
   useEffect(() => {
     fetchDemandForecast();
+  }, [supabase, historyRange, predictionRange]);
 
+  useEffect(() => {
     const handleRefresh = () => fetchDemandForecast();
     window.addEventListener("refresh-orders", handleRefresh);
     window.addEventListener("refresh-analytics", handleRefresh);
@@ -138,34 +162,44 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
       window.removeEventListener("refresh-orders", handleRefresh);
       window.removeEventListener("refresh-analytics", handleRefresh);
     };
-  }, [supabase]);
+  }, [supabase, historyRange, predictionRange]);
 
-  const handleRunAnalysis = () => {
+  const handleRunAnalysis = async () => {
     if (insufficientData) return;
     setIsAnalyzing(true);
     setRecommendation(null);
 
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      const response = await fetch("/api/forecast-analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chartData,
+          language,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate AI analysis");
+      }
+
+      const data = await response.json();
+      setRecommendation(data.recommendation);
+
       const newConfidence = 92 + Math.random() * 6;
       setConfidence(Number(newConfidence.toFixed(1)));
-
-      const recommendations =
-        language === "ID"
-          ? [
-              "AI mendeteksi lonjakan permintaan 15% pada kategori produk terpopuler minggu depan. Segera pastikan restock unit menipis.",
-              "Trend penjualan stabil. Pertahankan stok saat ini dan fokus pada optimasi harga Flash Sale.",
-              "Peringatan: Beberapa stok produk akan habis dalam 5 hari berdasarkan kecepatan penjualan saat ini. Restock disarankan segera.",
-            ]
-          : [
-              "AI detected a 15% demand spike in bestsellers next week. Restock depleting units immediately.",
-              "Stable sales trend. Maintain current stock levels and focus on Flash Sale price optimization.",
-              "Warning: Product stocks will deplete in 5 days based on current velocity. Immediate restock recommended.",
-            ];
+    } catch (err: any) {
+      console.error("AI Analysis Error:", err);
       setRecommendation(
-        recommendations[Math.floor(Math.random() * recommendations.length)],
+        language === "ID"
+          ? "Gagal menghubungi AI Lumina. Silakan coba sesaat lagi."
+          : "Failed to connect to Lumina AI. Please try again shortly."
       );
-    }, 2000);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   if (isLoading || loading) {
@@ -244,6 +278,52 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
           </div>
         ) : (
           <>
+            {/* Filter controls */}
+            <div className="flex flex-wrap items-center gap-4 mb-5 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-900/60 text-xs">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[9px]">
+                  {language === "ID" ? "Filter Grafik:" : "Graph Filters:"}
+                </span>
+              </div>
+
+              {/* History Filter */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="history-range-select" className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                  {currentLabels.historicalData}
+                </label>
+                <select
+                  id="history-range-select"
+                  value={historyRange}
+                  onChange={(e) => setHistoryRange(Number(e.target.value))}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs transition-colors hover:border-slate-350 dark:hover:border-slate-700"
+                >
+                  <option value={7}>{currentLabels.daysAgo(7)}</option>
+                  <option value={30}>{currentLabels.monthsAgo(1)}</option>
+                  <option value={90}>{currentLabels.monthsAgo(3)}</option>
+                  <option value={180}>{currentLabels.monthsAgo(6)}</option>
+                  <option value={365}>{currentLabels.yearAgo}</option>
+                </select>
+              </div>
+
+              {/* Prediction Filter */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="prediction-range-select" className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                  {currentLabels.predictionRange}
+                </label>
+                <select
+                  id="prediction-range-select"
+                  value={predictionRange}
+                  onChange={(e) => setPredictionRange(Number(e.target.value))}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs transition-colors hover:border-slate-350 dark:hover:border-slate-700"
+                >
+                  <option value={7}>{currentLabels.nextDays(7)}</option>
+                  <option value={30}>{currentLabels.nextMonths(1)}</option>
+                  <option value={90}>{currentLabels.nextMonths(3)}</option>
+                  <option value={180}>{currentLabels.nextMonths(6)}</option>
+                </select>
+              </div>
+            </div>
+
             {recommendation && (
               <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-500">
                 <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
@@ -253,7 +333,7 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
               </div>
             )}
 
-            <div className="h-[210px] w-full">
+            <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
@@ -358,53 +438,6 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/50 group">
-                <div className="flex items-center gap-2">
-                  <Star className="w-3.5 h-3.5 text-yellow-500" />
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                    {t.productRating || "Rating"}
-                  </span>
-                </div>
-                <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                  {t.impact || "Impact"}: High (4.8+)
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/50 group">
-                <div className="flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                    {t.generation || "Cohort"}
-                  </span>
-                </div>
-                <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                  Gen Z & Millennial
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/50 group">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                    {t.flashSale || "Campaign"}
-                  </span>
-                </div>
-                <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                  {t.activeStrategy || "Active"}
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/50 group">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-purple-500" />
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                    {t.holidayEvent || "Event"}
-                  </span>
-                </div>
-                <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                  {t.weekendForecast || "Weekend Alert"}
-                </p>
-              </div>
             </div>
           </>
         )}
