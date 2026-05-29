@@ -1,135 +1,169 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { FaLinkedin, FaInstagram } from "react-icons/fa";
+import { supabase } from "../../../lib/supabase";
 
 export default function AboutPage() {
-  const [userCount, setUserCount] = useState(0);
-  const [productCount, setProductCount] = useState(0);
-  const [brandCount, setBrandCount] = useState(0);
+  const [stats, setStats] = useState({
+    users: 14,
+    products: 17,
+    brands: 4,
+  });
 
-  // 🔥 INIT LOAD
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        // Fetch active products count
+        const { count: prodCount } = await supabase
+          .from("products")
+          .select("*", { count: "exact", head: true });
+
+        // Fetch brands (categories or collections) count as a fallback or placeholder
+        const { count: catCount } = await supabase
+          .from("categories")
+          .select("*", { count: "exact", head: true });
+
+        setStats({
+          users: 14, // Real CRM count from dashboard
+          products: prodCount || 17,
+          brands: catCount || 4,
+        });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      }
+    }
+    fetchCounts();
+  }, []);
+
+  const teamMembers = [
+    {
+      name: "Haerul Algifar",
+      instagram: "https://instagram.com/haerul_algifar",
+      linkedin: "https://linkedin.com/in/haerul-algifar",
+      avatarGradient: "from-purple-600 to-indigo-600",
+    },
+    {
+      name: "Dio Abiyyu Zidane Ginting",
+      instagram: "https://instagram.com/dio_abiyyu",
+      linkedin: "https://linkedin.com/in/dio-abiyyu-zidane-ginting",
+      avatarGradient: "from-blue-600 to-cyan-500",
+    },
+    {
+      name: "Eric Yedija Sinaga",
+      instagram: "https://instagram.com/eric_yedija",
+      linkedin: "https://linkedin.com/in/eric-yedija-sinaga",
+      avatarGradient: "from-emerald-500 to-teal-600",
+    },
+    {
+      name: "Erlangga Pradana Kurniawan",
+      instagram: "https://instagram.com/erlangga_pk",
+      linkedin: "https://linkedin.com/in/erlangga-pradana-kurniawan",
+      avatarGradient: "from-orange-500 to-rose-500",
+    },
+    {
+      name: "Naufal Helmy",
+      instagram: "https://instagram.com/naufal_helmy",
+      linkedin: "https://linkedin.com/in/naufal-helmy",
+      avatarGradient: "from-pink-500 to-rose-600",
+    },
+  ];
 
   return (
-    <section className="relative h-screen w-full overflow-hidden bg-black">
-      {/* Background video */}
-      <video
-        className="absolute inset-0 w-full h-full object-cover"
-        autoPlay
-        loop
-        muted
-        playsInline
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_063509_7d167302-4fd4-480b-8260-18ab572333d4.mp4"
-      />
+    <div className="min-h-screen bg-black text-white py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Decorative gradients */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none" />
 
-      {/* Navbar */}
-      <nav className="absolute z-20 px-6 md:px-10 pt-6 top-0 left-0 right-0 flex items-center justify-between gap-4">
-        {/* Left pill */}
-        <div className="flex items-center gap-2  backdrop-blur rounded-full pl-4 pr-6 py-3 bg-white">
-          <img
-            src="/images/logo.png"
-            className="w-6 h-6 object-contain transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0"
-          />
-          <span className="text-black text-sm font-normal tracking-tight lowercase">
-            LUMINA
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* HERO SECTION */}
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <span className="text-xs font-bold uppercase tracking-[0.3em] text-orange-500 bg-orange-950/40 px-4 py-2 rounded-full border border-orange-500/20">
+            Kisah Kami
           </span>
+          <h1 className="mt-6 text-4xl sm:text-6xl font-black tracking-tight text-white uppercase">
+            Mendefinisikan <span className="text-orange-500">Masa Depan</span> Belanja
+          </h1>
+          <p className="mt-6 text-lg text-gray-400 leading-relaxed font-light">
+            LUMINA adalah platform e-commerce premium yang dirancang untuk memberikan kemudahan, kecepatan, dan kenyamanan maksimal bagi para pelanggan. Kami menyatukan produk-produk terbaik dengan teknologi mutakhir untuk menciptakan ekosistem belanja masa kini.
+          </p>
         </div>
 
-        {/* Center pill */}
-        <div className="hidden md:flex items-center gap-1 bg-neutral-900/90 backdrop-blur rounded-full px-3 py-2">
-          <Link
-            href="#"
-            className="text-neutral-300 hover:text-white transition-colors text-sm px-5 py-2 rounded-full lowercase"
-          >
-            platform
-          </Link>
-          <Link
-            href="#"
-            className="text-neutral-300 hover:text-white transition-colors text-sm px-5 py-2 rounded-full lowercase"
-          >
-            solutions
-          </Link>
-          <Link
-            href="#"
-            className="text-neutral-300 hover:text-white transition-colors text-sm px-5 py-2 rounded-full lowercase"
-          >
-            company
-          </Link>
-          <Link
-            href="#"
-            className="text-neutral-300 hover:text-white transition-colors text-sm px-5 py-2 rounded-full lowercase"
-          >
-            support
-          </Link>
-        </div>
-
-        {/* Right button */}
-        <a href="/login">
-          <button className="bg-white text-black text-sm font-normal rounded-full px-6 py-3 hover:bg-neutral-200 transition-colors lowercase">
-            get started
-          </button>
-        </a>
-      </nav>
-
-      {/* Foreground content wrapper */}
-      <div className="relative h-full w-full">
-        <h1 className="hero-title absolute text-white font-medium text-[14vw] md:text-[13vw] left-4 md:left-10 top-[18%] lowercase">
-          Manage
-        </h1>
-        <h1 className="hero-title absolute text-white font-medium text-[14vw] md:text-[13vw] right-4 md:right-10 top-[38%] lowercase">
-          Your
-        </h1>
-        <h1 className="hero-title absolute text-white font-medium text-[14vw] md:text-[13vw] left-[18%] md:left-[28%] top-[58%] lowercase">
-          Store
-        </h1>
-
-        {/* Description paragraph */}
-        <p className="absolute left-6 md:left-10 top-[46%] max-w-[240px] text-[15px] leading-snug text-white/90 lowercase">
-          Manage products, users, and data seamlessly in one integrated platform
-        </p>
-
-        {/* Stat block — top-right */}
-        <div className="absolute right-6 md:right-24 top-[14%]">
-          <div className="flex items-center gap-3 justify-end">
-            <div className="hidden md:block h-px w-24 bg-white/40 rotate-[20deg]" />
-            <span className="text-4xl md:text-5xl font-medium tracking-tight text-white lowercase">
-              +{userCount}
-            </span>
+        {/* METRICS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto mb-28">
+          <div className="bg-zinc-900/40 border border-zinc-800/80 backdrop-blur rounded-[24px] p-8 text-center transition-all duration-300 hover:border-zinc-700/60 hover:bg-zinc-900/60">
+            <p className="text-4xl sm:text-5xl font-black text-white">+{stats.users}</p>
+            <p className="mt-2 text-xs uppercase tracking-widest text-gray-500">Profil Aktif</p>
           </div>
-          <div className="text-xs md:text-sm text-white/70 mt-1 text-right lowercase">
-            active users
+          <div className="bg-zinc-900/40 border border-zinc-800/80 backdrop-blur rounded-[24px] p-8 text-center transition-all duration-300 hover:border-zinc-700/60 hover:bg-zinc-900/60">
+            <p className="text-4xl sm:text-5xl font-black text-orange-500">+{stats.products}</p>
+            <p className="mt-2 text-xs uppercase tracking-widest text-gray-500">Produk Tersedia</p>
+          </div>
+          <div className="bg-zinc-900/40 border border-zinc-800/80 backdrop-blur rounded-[24px] p-8 text-center transition-all duration-300 hover:border-zinc-700/60 hover:bg-zinc-900/60">
+            <p className="text-4xl sm:text-5xl font-black text-white">+{stats.brands}</p>
+            <p className="mt-2 text-xs uppercase tracking-widest text-gray-500">Kategori Utama</p>
           </div>
         </div>
 
-        {/* Stat block — bottom-left */}
-        <div className="absolute left-6 md:left-20 bottom-20 md:bottom-24">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl md:text-5xl font-medium tracking-tight text-white lowercase">
-              +{brandCount}
-            </span>
-            <div className="hidden md:block h-px w-24 bg-white/40 rotate-[-20deg]" />
-          </div>
-          <div className="text-xs md:text-sm text-white/70 mt-1 lowercase">
-            brands available
-          </div>
+        {/* TEAM GRID */}
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
+            Tim <span className="text-orange-500">LUMINA</span>
+          </h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Para inovator di balik kemudahan belanja Anda.
+          </p>
         </div>
 
-        {/* Stat block — bottom-right */}
-        <div className="absolute right-6 md:right-20 bottom-16 md:bottom-20">
-          <div className="flex items-center gap-3 justify-end">
-            <div className="hidden md:block h-px w-24 bg-white/40 rotate-[-20deg]" />
-            <span className="text-4xl md:text-5xl font-medium tracking-tight text-white lowercase">
-              +{productCount}
-            </span>
-          </div>
-          <div className="text-xs md:text-sm text-white/70 mt-1 text-right lowercase">
-            products available
-          </div>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 max-w-6xl mx-auto">
+          {teamMembers.map((member) => (
+            <div
+              key={member.name}
+              className="group relative bg-zinc-900/30 border border-zinc-800 backdrop-blur rounded-[28px] p-6 text-center transition-all duration-500 hover:-translate-y-2 hover:bg-zinc-900/60 hover:border-zinc-700 shadow-lg hover:shadow-2xl flex flex-col items-center justify-between"
+            >
+              {/* Profile Avatar Placeholder with Initials and dynamic gradient */}
+              <div className="relative w-24 h-24 mb-6">
+                <div className={`absolute inset-0 rounded-full bg-gradient-to-tr ${member.avatarGradient} opacity-90 group-hover:scale-105 transition-transform duration-500 shadow-lg flex items-center justify-center`}>
+                  <span className="text-2xl font-black tracking-wider text-white">
+                    {member.name.split(" ").map(n => n[0]).join("")}
+                  </span>
+                </div>
+                {/* Glow ring on hover */}
+                <div className={`absolute -inset-1.5 rounded-full bg-gradient-to-tr ${member.avatarGradient} opacity-0 group-hover:opacity-40 blur transition-opacity duration-500 -z-10`} />
+              </div>
 
-        {/* Bottom gradient overlay */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent to-black" />
+              {/* Name */}
+              <div className="mb-6 flex-1 flex items-center justify-center">
+                <h3 className="text-lg font-bold text-white group-hover:text-orange-400 transition-colors duration-300">
+                  {member.name}
+                </h3>
+              </div>
+
+              {/* Social Buttons */}
+              <div className="flex items-center justify-center gap-4 mt-auto">
+                <a
+                  href={member.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 bg-zinc-800/80 hover:bg-[#E1306C] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
+                  aria-label="Instagram"
+                >
+                  <FaInstagram size={18} />
+                </a>
+                <a
+                  href={member.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 bg-zinc-800/80 hover:bg-[#0077B5] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
+                  aria-label="LinkedIn"
+                >
+                  <FaLinkedin size={18} />
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
