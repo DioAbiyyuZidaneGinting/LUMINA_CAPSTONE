@@ -64,15 +64,29 @@ export default function Footer() {
           <h3 className="text-white font-semibold mb-4 text-base tracking-wider uppercase">Ikuti sosial media</h3>
 
           <div className="flex gap-4 mb-6">
-            <div className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 cursor-pointer text-gray-300 hover:text-white transition-colors duration-200">
+            <a
+              href="#"
+              className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 text-gray-300 hover:text-white transition-colors duration-200"
+              aria-label="LinkedIn"
+            >
               <FaLinkedin size={18} />
-            </div>
-            <div className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 cursor-pointer text-gray-300 hover:text-white transition-colors duration-200">
+            </a>
+            <a
+              href="#"
+              className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 text-gray-300 hover:text-white transition-colors duration-200"
+              aria-label="Instagram"
+            >
               <FaInstagram size={18} />
-            </div>
-            <div className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 cursor-pointer text-gray-300 hover:text-white transition-colors duration-200">
+            </a>
+            <a
+              href="https://github.com/DioAbiyyuZidaneGinting/LUMINA_CAPSTONE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#1a1a1a] p-3 rounded-full hover:bg-gray-700 text-gray-300 hover:text-white transition-colors duration-200"
+              aria-label="GitHub"
+            >
               <FaGithub size={18} />
-            </div>
+            </a>
           </div>
 
           <hr className="border-gray-800 mb-4" />

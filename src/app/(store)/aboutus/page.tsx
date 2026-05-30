@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FaLinkedin, FaInstagram } from "react-icons/fa";
+import { FaLinkedin, FaInstagram, FaGithub } from "react-icons/fa";
 import { supabase } from "../../../lib/supabase";
 
 export default function AboutPage() {
@@ -36,35 +36,43 @@ export default function AboutPage() {
     fetchCounts();
   }, []);
 
-  const teamMembers = [
+  interface TeamMember {
+    name: string;
+    instagram: string;
+    linkedin: string;
+    avatarGradient: string;
+    github?: string;
+  }
+
+  const teamMembers: TeamMember[] = [
     {
       name: "Haerul Algifar",
-      instagram: "https://instagram.com/haerul_algifar",
-      linkedin: "https://linkedin.com/in/haerul-algifar",
+      instagram: "https://www.instagram.com/haerul_920",
+      linkedin: "https://www.linkedin.com/in/haerul920",
       avatarGradient: "from-purple-600 to-indigo-600",
     },
     {
       name: "Dio Abiyyu Zidane Ginting",
-      instagram: "https://instagram.com/dio_abiyyu",
-      linkedin: "https://linkedin.com/in/dio-abiyyu-zidane-ginting",
+      instagram: "https://www.instagram.com/my_nameis_dio?igsh=MWl2aHlwM216OXp2Mg==",
+      linkedin: "https://www.linkedin.com/in/dioabiyyuzidaneginting13/",
       avatarGradient: "from-blue-600 to-cyan-500",
     },
     {
       name: "Eric Yedija Sinaga",
-      instagram: "https://instagram.com/eric_yedija",
-      linkedin: "https://linkedin.com/in/eric-yedija-sinaga",
+      instagram: "https://www.instagram.com/ericyedijas?igsh=MW81Y2xmZzN3YTEzbw==",
+      linkedin: "https://www.linkedin.com/in/eric-yedija-sinaga-9627a537b/",
       avatarGradient: "from-emerald-500 to-teal-600",
     },
     {
       name: "Erlangga Pradana Kurniawan",
-      instagram: "https://instagram.com/erlangga_pk",
-      linkedin: "https://linkedin.com/in/erlangga-pradana-kurniawan",
+      instagram: "https://www.instagram.com/forpraada/",
+      linkedin: "https://www.linkedin.com/in/erlangga-pradana-kurniawan-b081aa30b/",
       avatarGradient: "from-orange-500 to-rose-500",
     },
     {
       name: "Naufal Helmy",
-      instagram: "https://instagram.com/naufal_helmy",
-      linkedin: "https://linkedin.com/in/naufal-helmy",
+      instagram: "https://www.instagram.com/naufalhelmyy/",
+      linkedin: "https://www.linkedin.com/in/naufal-helmy-mustofa?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app",
       avatarGradient: "from-pink-500 to-rose-600",
     },
   ];
@@ -141,24 +149,39 @@ export default function AboutPage() {
 
               {/* Social Buttons */}
               <div className="flex items-center justify-center gap-4 mt-auto">
-                <a
-                  href={member.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-zinc-800/80 hover:bg-[#E1306C] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                  aria-label="Instagram"
-                >
-                  <FaInstagram size={18} />
-                </a>
-                <a
-                  href={member.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-zinc-800/80 hover:bg-[#0077B5] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                  aria-label="LinkedIn"
-                >
-                  <FaLinkedin size={18} />
-                </a>
+                {member.instagram && (
+                  <a
+                    href={member.instagram}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-zinc-800/80 hover:bg-[#E1306C] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
+                    aria-label="Instagram"
+                  >
+                    <FaInstagram size={18} />
+                  </a>
+                )}
+                {member.linkedin && (
+                  <a
+                    href={member.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-zinc-800/80 hover:bg-[#0077B5] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
+                    aria-label="LinkedIn"
+                  >
+                    <FaLinkedin size={18} />
+                  </a>
+                )}
+                {member.github && (
+                  <a
+                    href={member.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-zinc-800/80 hover:bg-[#333] text-gray-300 hover:text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
+                    aria-label="GitHub"
+                  >
+                    <FaGithub size={18} />
+                  </a>
+                )}
               </div>
             </div>
           ))}
