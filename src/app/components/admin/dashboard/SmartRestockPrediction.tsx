@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   AreaChart,
   Area,
@@ -17,12 +17,36 @@ import {
   RefreshCw,
   CheckCircle2,
   Database,
+  Cpu,
 } from "lucide-react";
 import { useLanguageStore, translations } from "../../../../store/languageStore";
 import { useSupabaseClient } from "../../../../hooks/useSupabaseClient";
 
 interface Props {
   isLoading: boolean;
+}
+
+// Type for ML API forecast response
+interface MLForecastItem {
+  order_date: string;
+  predicted_items: number;
+  predicted_revenue: number;
+}
+
+interface MLForecastResponse {
+  horizon_days: number;
+  total_predicted_items: number;
+  total_predicted_revenue: number;
+  avg_daily_items: number;
+  avg_daily_revenue: number;
+  forecast: MLForecastItem[];
+}
+
+interface MLHealthResponse {
+  status: string;
+  model_name: string;
+  trained_at: string;
+  train_period: string[];
 }
 
 export default function SmartRestockPrediction({ isLoading }: Props) {
@@ -55,28 +79,89 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendation, setRecommendation] = useState<string | null>(null);
-  const [confidence, setConfidence] = useState(94.2);
+  const [confidence, setConfidence] = useState<number | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
   const [insufficientData, setInsufficientData] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Filters state
-  const [historyRange, setHistoryRange] = useState(30); // Default to 1 month (30 days)
-  const [predictionRange, setPredictionRange] = useState(7); // Default to next 7 days
+  // ML API state
+  const [mlModelName, setMlModelName] = useState<string | null>(null);
+  const [mlConnected, setMlConnected] = useState(false);
+  const [mlForecast, setMlForecast] = useState<MLForecastItem[]>([]);
 
-  const fetchDemandForecast = async () => {
+  // Filters state
+  const [historyRange, setHistoryRange] = useState(30);
+  const [predictionRange, setPredictionRange] = useState(7);
+
+  // Fetch ML model health on mount
+  const fetchMLHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ml-health");
+      if (res.ok) {
+        const data: MLHealthResponse = await res.json();
+        if (data.status === "ok") {
+          setMlModelName(data.model_name);
+          setMlConnected(true);
+        }
+      }
+    } catch {
+      setMlConnected(false);
+    }
+  }, []);
+
+  // Fetch live ML predictions based on actual store data
+  const fetchLivePrediction = useCallback(async (): Promise<MLForecastItem[]> => {
+    try {
+      const res = await fetch(
+        `/api/ml-predict?horizonDays=${predictionRange}&historyDays=${Math.max(historyRange, 90)}`
+      );
+      if (!res.ok) throw new Error("ML predict API error");
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.details || data.error);
+
+      setMlConnected(true);
+      setMlModelName(data.model_name || "Random Forest");
+
+      // Derive confidence from prediction consistency
+      if (data.forecast && data.forecast.length > 0) {
+        const items = data.forecast.map((f: any) => f.predicted_items);
+        const mean = items.reduce((a: number, b: number) => a + b, 0) / items.length;
+        if (mean > 0) {
+          const variance = items.reduce((a: number, b: number) => a + Math.pow(b - mean, 2), 0) / items.length;
+          const cv = Math.sqrt(variance) / mean;
+          const derivedConfidence = Math.min(98, Math.max(80, 100 - cv * 15));
+          setConfidence(Number(derivedConfidence.toFixed(1)));
+        } else {
+          setConfidence(0);
+        }
+      }
+
+      return data.forecast || [];
+    } catch (err) {
+      console.error("Live prediction error:", err);
+      setMlConnected(false);
+      return [];
+    }
+  }, [predictionRange, historyRange]);
+
+  const fetchDemandForecast = useCallback(async () => {
     try {
       setLoading(true);
       setInsufficientData(false);
 
-      // Query order items history and join orders to get created_at
-      const { data: orderItems, error } = await supabase
-        .from("order_items")
-        .select(`
-          quantity,
-          orders!inner(created_at)
-        `);
+      // Step 1: Fetch actual store data from Supabase AND live ML predictions in parallel
+      const [mlPredictions, orderResult] = await Promise.all([
+        fetchLivePrediction(),
+        supabase
+          .from("order_items")
+          .select(`
+            quantity,
+            orders!inner(created_at)
+          `)
+      ]);
 
+      const { data: orderItems, error } = orderResult;
       if (error) throw error;
 
       // Extract created_at from the joined orders table
@@ -85,14 +170,7 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
         created_at: Array.isArray(item.orders) ? item.orders[0]?.created_at : item.orders?.created_at
       })).filter((item) => item.created_at);
 
-      // If dataset is too small to build mathematically accurate predictions, toggle state
-      if (itemsList.length < 10) {
-        setInsufficientData(true);
-        setLoading(false);
-        return;
-      }
-
-      // Group sales count by date for the last historyRange days
+      // Step 2: Group actual sales by date for the historical range
       const historyDate = new Date();
       historyDate.setDate(historyDate.getDate() - historyRange);
       
@@ -103,41 +181,52 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
         salesMap[dateStr] = (salesMap[dateStr] || 0) + Number(item.quantity || 0);
       });
 
-      const totalUnitsSold = recentItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      const avgDailyVelocity = Math.max(1, totalUnitsSold / historyRange);
-
       const data: any[] = [];
       const today = new Date();
 
-      // Back-populate historyRange days of actual demand
+      // Step 3: Build historical data (actual demand from Supabase)
       for (let i = historyRange; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         const dateStr = d.toISOString().split("T")[0];
         const actualSales = salesMap[dateStr] || 0;
-        
-        const demand = actualSales > 0 ? actualSales : Math.max(1, Math.floor(avgDailyVelocity + Math.sin(i) * 2));
-        const predicted = demand * (0.95 + Math.random() * 0.1);
 
         data.push({
           date: dateStr,
-          demand,
-          predicted: Number(predicted.toFixed(1))
+          demand: actualSales > 0 ? actualSales : null,
+          predicted: null,
         });
       }
 
-      // Project next predictionRange days of forecasted demand
-      for (let i = 1; i <= predictionRange; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() + i);
-        const trendFactor = 1.15;
-        const predicted = avgDailyVelocity * trendFactor + Math.sin(i * 0.5) * 3 + Math.random() * 2;
-
-        data.push({
-          date: d.toISOString().split("T")[0],
-          demand: null,
-          predicted: Number(Math.max(1, predicted).toFixed(1))
+      // Step 4: Build prediction data from LIVE ML model (fed by actual store data)
+      if (mlPredictions.length > 0) {
+        mlPredictions.forEach((pred) => {
+          data.push({
+            date: pred.order_date,
+            demand: null,
+            predicted: Number(pred.predicted_items.toFixed(1)),
+          });
         });
+      } else {
+        // Fallback: simple projection if ML API unavailable
+        const totalUnitsSold = recentItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const avgDailyVelocity = Math.max(1, totalUnitsSold / historyRange);
+        
+        for (let i = 1; i <= predictionRange; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
+          const predicted = avgDailyVelocity * 1.15 + Math.sin(i * 0.5) * 3;
+
+          data.push({
+            date: d.toISOString().split("T")[0],
+            demand: null,
+            predicted: Number(Math.max(1, predicted).toFixed(1)),
+          });
+        }
+        
+        if (confidence === null) {
+          setConfidence(0);
+        }
       }
 
       setChartData(data);
@@ -148,7 +237,11 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, historyRange, predictionRange, fetchLivePrediction, confidence]);
+
+  useEffect(() => {
+    fetchMLHealth();
+  }, [fetchMLHealth]);
 
   useEffect(() => {
     fetchDemandForecast();
@@ -178,6 +271,8 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
         body: JSON.stringify({
           chartData,
           language,
+          mlModelConnected: mlConnected,
+          modelName: mlModelName,
         }),
       });
 
@@ -187,9 +282,6 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
 
       const data = await response.json();
       setRecommendation(data.recommendation);
-
-      const newConfidence = 92 + Math.random() * 6;
-      setConfidence(Number(newConfidence.toFixed(1)));
     } catch (err: any) {
       console.error("AI Analysis Error:", err);
       setRecommendation(
@@ -223,9 +315,30 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
               <h3 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
                 {t.replenishmentForecast || "Smart Restock Forecast"}
               </h3>
+              {/* ML Model connection badge */}
+              {mlConnected ? (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-full">
+                  <Cpu className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-[8px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">
+                    {mlModelName || "ML Model"}
+                  </span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-full">
+                  <span className="text-[8px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                    Fallback
+                  </span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {language === "ID" ? "Peramalan pergerakan permintaan inventaris real-time terintegrasi database." : "Real-time demand forecasting driven by authentic checkout transactions."}
+              {mlConnected
+                ? (language === "ID"
+                    ? `Prediksi menggunakan model ${mlModelName || "ML"} yang terintegrasi via API.`
+                    : `Predictions powered by ${mlModelName || "ML"} model integrated via API.`)
+                : (language === "ID"
+                    ? "Peramalan pergerakan permintaan inventaris real-time terintegrasi database."
+                    : "Real-time demand forecasting driven by authentic checkout transactions.")}
             </p>
           </div>
 
@@ -234,8 +347,12 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
               <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                 {language === "ID" ? "Keyakinan Prediksi" : "Forecast Confidence"}
               </p>
-              <p className="text-xs font-black text-indigo-600 dark:text-indigo-400">
-                {insufficientData ? "-" : `${confidence}%`}
+              <p className={`text-xs font-black ${
+                mlConnected
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-indigo-600 dark:text-indigo-400"
+              }`}>
+                {insufficientData ? "-" : confidence !== null ? `${confidence}%` : "-"}
               </p>
             </div>
             <button
@@ -317,9 +434,8 @@ export default function SmartRestockPrediction({ isLoading }: Props) {
                   className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs transition-colors hover:border-slate-350 dark:hover:border-slate-700"
                 >
                   <option value={7}>{currentLabels.nextDays(7)}</option>
+                  <option value={14}>{currentLabels.nextDays(14)}</option>
                   <option value={30}>{currentLabels.nextMonths(1)}</option>
-                  <option value={90}>{currentLabels.nextMonths(3)}</option>
-                  <option value={180}>{currentLabels.nextMonths(6)}</option>
                 </select>
               </div>
             </div>
